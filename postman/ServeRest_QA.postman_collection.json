@@ -1,0 +1,718 @@
+{
+	"info": {
+		"_postman_id": "f93d496e-335b-4b38-8660-2a927188e471",
+		"name": "ServeRest - Fluxo Completo QA",
+		"description": "# 📘 API ServeRest - Testes de Automação de QA com Postman\n\nEsta documentação e coleção do Postman foram desenvolvidas como parte de um teste técnico de QA, focando na automação de testes da API pública [ServeRest](https://serverest.dev). O objetivo é demonstrar a capacidade de criar fluxos de teste robustos, com validação de dados e cenários de sucesso e falha.\n\n---\n\n## ✨ Funcionalidades e Abordagem de Teste\n\nA coleção `ServeRest_QA` abrange os seguintes aspectos e fluxos de teste:\n\n* **Organização Clara:** Requisições organizadas em pastas lógicas (Ex: Auth, Produto, Carrinho).\n* **Descrições Detalhadas:** Cada endpoint possui descrições claras de seu propósito e comportamento.\n* **Automação com Postman Scripts:** Utilização intensiva de scripts na aba \"Tests\" para:\n    * **Validação de Status Code:** Verifica se a resposta da API retorna o código HTTP esperado.\n    * **Validação de Mensagens:** Confirma as mensagens de sucesso e erro retornadas pela API.\n    * **Validação de Schema (tv4):** Garante que a estrutura e os tipos de dados das respostas da API estão conforme o esperado, aumentando a robustez dos testes.\n    * **Cenários Positivos e Negativos:** Testes para o fluxo de sucesso e para situações de erro esperadas (ex: credenciais inválidas, recurso não encontrado).\n* **Variáveis de Ambiente:** Uso estratégico de variáveis de ambiente (`baseUrl`, `token`, `userId`, `productId`, `currentTestUserEmail`, `currentTestUserPassword`) para:\n    * Configurar a URL base da API.\n    * Gerenciar dados dinâmicos (e-mails, senhas, IDs) para cada execução de teste.\n    * Permitir que requisições subsequentes utilizem dados gerados por requisições anteriores (ex: token de autenticação, ID de produto).\n* **Geração de Dados Dinâmicos:** Utilização de variáveis dinâmicas do Postman (`{{$timestamp}}`, `{{$randomEmail}}`, etc.) e scripts para gerar dados únicos a cada execução, prevenindo conflitos e garantindo a repetibilidade dos testes.\n* **Fluxo de Teste Completo (End-to-End):**\n    1.  **Criação de Usuário (`POST /usuarios`):** Cadastra um novo usuário administrador para os testes.\n    2.  **Login (`POST /login`):** Realiza o login com o usuário recém-criado e armazena o token de autenticação na variável de ambiente `token`.\n    3.  **Criação de Produto (`POST /produtos`):** Cadastra um novo produto, utilizando o token e gerando dados únicos para o produto, salvando seu `_id`.\n    4.  **Edição de Produto (`PUT /produtos/{_id}`):** Atualiza os dados do produto recém-criado, usando o `productId` e o `token`.\n    5.  **Exclusão de Produto (`DELETE /produtos/{_id}`):** Remove o produto do sistema, usando o `productId` e o `token`.\n    6.  **Validação de Exclusão (`GET /produtos/{_id}`):** Tenta buscar o produto recém-excluído para confirmar que ele não existe mais (espera-se um erro `400 Bad Request` com mensagem \"Produto não encontrado\").\n    7.  **Validação de Edição Pós-Exclusão (`PUT /produtos/{_id}`):** Tenta editar o produto após sua exclusão. Espera-se um erro (`400 Bad Request` com \"Produto não encontrado\"), ou uma `201 Created` caso a API recrie o recurso, o que seria uma falha para o objetivo do teste de \"não poder mais editar\".\n\n---\n\n## 🚀 Como Usar esta Coleção\n\nPara executar os testes e explorar a automação:\n\n1.  **Importe o Environment:**\n    * No Postman, vá em `Environments` (no menu lateral esquerdo).\n    * Clique em `Import` e selecione o arquivo de ambiente associado (Ex: `ServeRest_QA_Environment.postman_environment.json`, se fornecido separadamente, ou ele já pode vir embutido na coleção).\n    * Certifique-se de que o ambiente `ServeRest_QA_Environment` está **selecionado** no dropdown do Postman (canto superior direito).\n\n2.  **Importe a Coleção:**\n    * No Postman, vá em `Collections` (no menu lateral esquerdo).\n    * Clique em `Import` e selecione o arquivo `ServeRest_QA.postman_collection.json`.\n\n3.  **Execute o Fluxo de Testes:**\n    * Na barra lateral de `Collections`, passe o mouse sobre a coleção `ServeRest_QA`.\n    * Clique nos três pontinhos (`...`) e selecione `Run collection`.\n    * No \"Collection Runner\", certifique-se de que:\n        * Seu ambiente `ServeRest_QA_Environment` está selecionado.\n        * As requisições estão na ordem correta (conforme o fluxo de teste descrito acima). Você pode arrastá-las para reordenar se necessário.\n    * Clique em `Run ServeRest_QA` para iniciar a execução automatizada.\n\n4.  **Analise os Resultados:**\n    * O Collection Runner exibirá o resultado de cada requisição (Pass/Fail) e os detalhes dos testes.\n    * Abra o **Postman Console** (`Ctrl + Alt + C` ou `Cmd + Alt + C`) para ver os logs (`console.log`) dos scripts, que incluem informações sobre variáveis salvas (token, IDs).\n\n---\n\n## 📝 Observações Importantes\n\n* A API ServeRest possui algumas particularidades:\n    * Retorna `400 Bad Request` com a mensagem \"Produto não encontrado\" para requisições `GET` e `PUT` em IDs que não existem, em vez do mais comum `404 Not Found`. Os scripts de teste foram adaptados para este comportamento.\n    * Em alguns cenários, um `PUT` em um recurso inexistente pode resultar em uma `201 Created` (comportamento de \"upsert\"), o que pode ser uma falha lógica para testes que esperam que o recurso não seja mais editável após a exclusão. Os testes refletem essa validação.\n* Os comentários dentro do JSON do `body` das requisições **não são permitidos** pelo JSON padrão e foram removidos para garantir a funcionalidade da coleção.\n\n---",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1 - Registrar Usuário",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"// --- CENÁRIO POSITIVO ---",
+							"if (status === 201) {",
+							"  pm.test(\"✅ Usuário criado com sucesso - Status 201\", () => {",
+							"    pm.expect(json.message).to.eql(\"Cadastro realizado com sucesso\");",
+							"    pm.expect(json).to.have.property(\"_id\"); // Garante que o _id está na resposta",
+							"  });",
+							"",
+							"  // Salva o ID do usuário novo criado na variável de ambiente \"userId\"",
+							"  // Esta é a linha que você precisa adicionar/confirmar!",
+							"  pm.environment.set(\"userId\", json._id);",
+							"  console.log(\"Usuário ID salvo: \" + pm.environment.get(\"userId\")); // Opcional: para debug no console",
+							"",
+							" // Salva o EMAIL gerado dinamicamente para o login",
+							"  // IMPORTANTE: Para acessar o email que foi ENVIADO,",
+							"  // é melhor gerar o email no pré-request script e salvá-lo lá.",
+							"  // Se você usou {{timestamp}} diretamente no body,",
+							"  // a forma mais confiável de pegar o email *que foi enviado*",
+							"  // é acessá-lo através de pm.request.body.raw ou se a API retornar o email na resposta.",
+							"  // Assumindo que o email não está na resposta diretamente,",
+							"  // vamos usar o método mais robusto: gerar no pré-request.",
+							"",
+							"  const schema = {",
+							"    type: \"object\",",
+							"    required: [\"message\", \"_id\"],",
+							"    properties: {",
+							"      message: { type: \"string\" },",
+							"      _id: { type: \"string\" }",
+							"    }",
+							"  };",
+							"",
+							"  pm.test(\"✅ Schema da resposta está válido (201)\", () => {",
+							"    pm.expect(tv4.validate(json, schema)).to.be.true;",
+							"  });",
+							"}",
+							"",
+							"// --- CENÁRIOS NEGATIVOS ---",
+							"else if (status === 400) {",
+							"  pm.test(\"❌ Requisição inválida - Status 400\", () => {",
+							"    pm.expect(json).to.have.property(\"message\");",
+							"",
+							"    // Validação de mensagens específicas",
+							"    // A condição 'json.message.includes(\"Já existe\")' é bem genérica,",
+							"    // seria melhor ser mais específico se possível, como 'json.message === \"Já existe produto com esse nome\"'",
+							"    // ou 'json.email === \"Este email já está sendo usado\"' (se a API retornar 'email' em vez de 'message' para esse caso)",
+							"    if (json.message.includes(\"Já existe\")) {",
+							"      pm.expect(json.message).to.include(\"Já existe produto com esse nome\"); // Ajuste aqui para a mensagem correta de EMAIL DUPLICADO",
+							"    } else if (json.message.includes(\"nome\")) { // Exemplo para validação de campo",
+							"      pm.expect(json.message).to.include(\"nome\");",
+							"    }",
+							"    // Remove a validação de 'token' aqui, pois 400 é mais para erros de validação de input,",
+							"    // enquanto erro de token é geralmente 401.",
+							"    // else if (json.message.includes(\"token\")) {",
+							"    //   pm.expect(json.message).to.include(\"token\");",
+							"    // }",
+							"  });",
+							"",
+							"  const errorSchema = {",
+							"    type: \"object\",",
+							"    required: [\"message\"],",
+							"    properties: {",
+							"      message: { type: \"string\" }",
+							"    }",
+							"  };",
+							"",
+							"  pm.test(\"❌ Schema da resposta de erro está válido (400)\", () => {",
+							"    pm.expect(tv4.validate(json, errorSchema)).to.be.true;",
+							"  });",
+							"}",
+							"// Adicione um bloco específico para 401 Unauthorized se o cadastro de usuário puder retornar isso",
+							"else if (status === 401) {",
+							"    pm.test(\"❌ Requisição não autorizada - Status 401\", () => {",
+							"        pm.expect(json.message).to.eql(\"Token de acesso ausente, inválido, expirado ou usuário não é administrador.\");",
+							"    });",
+							"}",
+							"// --- OUTRO STATUS ---",
+							"else {",
+							"  pm.test(\"⚠️ Status inesperado\", () => {",
+							"    pm.expect([201, 400, 401]).to.include(status); // Incluí 401 na lista de esperados para ter mais controle",
+							"  });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Gera um timestamp único",
+							"const timestamp = Date.now();",
+							"const userEmail = `usuario.teste.${timestamp}@qa.com.br`;",
+							"const userPassword = \"senha\"; // A senha é fixa neste exemplo, mas poderia ser dinâmica",
+							"",
+							"// Salva o email e a senha nas variáveis de ambiente",
+							"pm.environment.set(\"currentTestUserEmail\", userEmail);",
+							"pm.environment.set(\"currentTestUserPassword\", userPassword);",
+							"",
+							"console.log(\"Gerando novo usuário com E-mail:\", userEmail);",
+							"console.log(\"Senha:\", userPassword);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"nome\": \"Usuário Teste {{timestamp}}\", \n  \"email\": \"{{currentTestUserEmail}}\", \n  \"password\": \"{{currentTestUserPassword}}\",\n  \"administrador\": \"true\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/usuarios",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"usuarios"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2 - Login e Salvar Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// A PARTIR DAQUI - COPIE E COLE ISSO INTEIRO NA ABA \"Tests\" DO SEU ENDPOINT DE LOGIN",
+							"",
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"// --- CENÁRIO POSITIVO: Login bem-sucedido ---",
+							"if (status === 200) {",
+							"  pm.test(\"✅ Status code é 200 OK (Login bem-sucedido)\", () => {",
+							"    pm.response.to.have.status(200);",
+							"  });",
+							"",
+							"  pm.test(\"✅ Mensagem de sucesso é 'Login realizado com sucesso'\", () => {",
+							"    pm.expect(json.message).to.eql(\"Login realizado com sucesso\");",
+							"  });",
+							"",
+							"  pm.test(\"✅ Token de autorização está presente e é válido\", () => {",
+							"    pm.expect(json).to.have.property('authorization');",
+							"    pm.expect(json.authorization).to.be.a('string').and.to.not.be.empty;",
+							"    // Garante que o token começa com \"Bearer \" e tem 3 partes JWT",
+							"    pm.expect(json.authorization).to.match(/^Bearer\\s[\\w-]+\\.[\\w-]+\\.[\\w-]+$/);",
+							"    // Salva o token de autorização para uso em outras requisições",
+							"    ",
+							"     // *** MUDANÇA AQUI: Remova 'Bearer ' ao salvar o token ***",
+							"    const fullToken = json.authorization; // Ex: \"Bearer eyJhb...\"",
+							"    const actualToken = fullToken.replace(\"Bearer \", \"\"); // Pega só o \"eyJhb...\"",
+							"",
+							"    pm.environment.set(\"token\", actualToken); // Salva APENAS o token",
+							"    console.log(\"Token de autorização salvo (sem Bearer): \" + pm.environment.get(\"token\"));",
+							"  });",
+							"",
+							"  // Validação de schema da resposta de sucesso",
+							"  const schemaSucesso = {",
+							"    type: \"object\",",
+							"    required: [\"message\", \"authorization\"],",
+							"    properties: {",
+							"      message: { type: \"string\" },",
+							"      authorization: { type: \"string\" }",
+							"    }",
+							"  };",
+							"",
+							"  pm.test(\"✅ Schema da resposta de sucesso é válido\", () => {",
+							"    pm.expect(tv4.validate(json, schemaSucesso)).to.be.true;",
+							"  });",
+							"",
+							"}",
+							"// --- CENÁRIO NEGATIVO: Credenciais inválidas (401 Unauthorized) ---",
+							"else if (status === 401) {",
+							"  pm.test(\"❌ Login falhou com credenciais inválidas - Status 401 Unauthorized\", () => {",
+							"    pm.expect(json.message).to.eql(\"Email e/ou senha inválidos\");",
+							"  });",
+							"",
+							"  const errorSchema401 = {",
+							"    type: \"object\",",
+							"    required: [\"message\"],",
+							"    properties: {",
+							"      message: { type: \"string\" }",
+							"    }",
+							"  };",
+							"",
+							"  pm.test(\"❌ Schema da resposta de erro (401) é válido\", () => {",
+							"    pm.expect(tv4.validate(json, errorSchema401)).to.be.true;",
+							"  });",
+							"}",
+							"// --- CENÁRIO NEGATIVO: Requisição malformada (400 Bad Request) ---",
+							"// (Ex: campos ausentes no body ou formato incorreto)",
+							"else if (status === 400) {",
+							"    pm.test(\"❌ Requisição de login malformada - Status 400 Bad Request\", () => {",
+							"        pm.expect(json).to.have.property('email'); // Ou 'password' ou 'message' dependendo da API",
+							"        // Você pode refinar as mensagens de erro aqui, se a API retornar mensagens específicas",
+							"        // pm.expect(json.email).to.eql(\"email não pode ficar em branco\");",
+							"    });",
+							"    const errorSchema400 = {",
+							"        type: \"object\",",
+							"        properties: {",
+							"            email: { type: \"string\" },",
+							"            password: { type: \"string\" },",
+							"            message: { type: \"string\" } // ServeRest pode retornar 'message' para alguns 400",
+							"        },",
+							"        minProperties: 1 // Garante que há pelo menos uma propriedade de erro",
+							"    };",
+							"    pm.test(\"❌ Schema da resposta de erro (400) é válido\", () => {",
+							"        pm.expect(tv4.validate(json, errorSchema400)).to.be.true;",
+							"    });",
+							"}",
+							"// --- OUTRO STATUS INESPERADO ---",
+							"else {",
+							"  pm.test(\"⚠️ Status inesperado na requisição de login\", () => {",
+							"    pm.expect([200, 401, 400]).to.include(status);",
+							"  });",
+							"}",
+							"// FIM DO SCRIPT - COPIE E COLE ISSO INTEIRO"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"{{currentTestUserEmail}}\",\n  \"password\": \"{{currentTestUserPassword}}\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/login",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3 - Criar Produto",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"if (status === 201) {",
+							"    pm.test(\"✅ Produto cadastrado com sucesso - Status 201\", () => {",
+							"        pm.expect(json.message).to.eql(\"Cadastro realizado com sucesso\");",
+							"        pm.expect(json).to.have.property(\"_id\");",
+							"    });",
+							"",
+							"    // Salva o ID do produto para uso em outros testes",
+							"    pm.environment.set(\"productId\", json._id);",
+							"    console.log(\"Produto ID salvo: \" + pm.environment.get(\"productId\"));",
+							"",
+							"    const schema = {",
+							"        type: \"object\",",
+							"        required: [\"message\", \"_id\"],",
+							"        properties: {",
+							"            message: { \"type\": \"string\" },",
+							"            _id: { \"type\": \"string\" }",
+							"        }",
+							"    };",
+							"    pm.test(\"✅ Schema da resposta está válido (201)\", () => {",
+							"        pm.expect(tv4.validate(json, schema)).to.be.true;",
+							"    });",
+							"} else if (status === 400) {",
+							"    pm.test(\"❌ Cadastro de produto falhou - Status 400\", () => {",
+							"        pm.expect(json).to.have.property(\"message\");",
+							"        // Aqui você pode adicionar validações mais específicas para mensagens de erro",
+							"        // Ex: pm.expect(json.message).to.include(\"Já existe produto com esse nome\");",
+							"    });",
+							"    // Adicione validação de schema para erros 400 se desejar",
+							"} else if (status === 401) {",
+							"         pm.test(\"❌ Não autorizado - Status 401\", () => {",
+							"            pm.expect(json.message).to.eql(\"Token de acesso ausente, inválido, expirado ou usuário não é administrador.\");",
+							"        });",
+							"} else {",
+							"    pm.test(\"⚠️ Status inesperado\", () => {",
+							"        pm.expect([201, 400, 401]).to.include(status);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"nome\": \"Produto Automático QA {{timestamp}}\",\n  \"preco\": 200,\n  \"descricao\": \"Produto criado via script\",\n  \"quantidade\": 10\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/produtos",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"produtos"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4 - Editar Produto",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"// --- CENÁRIO POSITIVO: Produto editado com sucesso ---",
+							"if (status === 200) {",
+							"    pm.test(\"✅ Status code é 200 OK (Produto editado com sucesso)\", () => {",
+							"        pm.response.to.have.status(200);",
+							"    });",
+							"",
+							"    pm.test(\"✅ Mensagem de sucesso é 'Registro alterado com sucesso'\", () => {",
+							"        pm.expect(json.message).to.eql(\"Registro alterado com sucesso\");",
+							"    });",
+							"",
+							"    // Opcional: Validar que o ID retornado é o mesmo que foi enviado",
+							"    pm.test(\"✅ ID do produto na resposta é o mesmo da requisição\", () => {",
+							"        // Assume que o ID alterado é retornado em 'json._id'",
+							"        // Ou que a requisição PUT é feita em um ID específico",
+							"        // Para verificar o ID enviado na requisição:",
+							"        const requestUrl = pm.request.url.toString();",
+							"        const productIdFromUrl = requestUrl.split('/').pop(); // Pega o último segmento da URL",
+							"        pm.expect(productIdFromUrl).to.eql(pm.environment.get(\"productId\"));",
+							"    });",
+							"",
+							"    const schemaSucesso = {",
+							"        type: \"object\",",
+							"        required: [\"message\"],",
+							"        properties: {",
+							"            message: { type: \"string\" }",
+							"        }",
+							"    };",
+							"",
+							"    pm.test(\"✅ Schema da resposta de sucesso é válido\", () => {",
+							"        pm.expect(tv4.validate(json, schemaSucesso)).to.be.true;",
+							"    });",
+							"",
+							"}",
+							"// --- CENÁRIOS NEGATIVOS ---",
+							"else if (status === 401) {",
+							"    pm.test(\"❌ Edição de produto falhou - Status 401 Unauthorized\", () => {",
+							"        pm.expect(json.message).to.eql(\"Token de acesso ausente, inválido, expirado ou usuário do token não existe mais\");",
+							"    });",
+							"    const errorSchema401 = { type: \"object\", required: [\"message\"], properties: { message: { type: \"string\" } } };",
+							"    pm.test(\"❌ Schema de erro (401) é válido\", () => { pm.expect(tv4.validate(json, errorSchema401)).to.be.true; });",
+							"}",
+							"else if (status === 400) {",
+							"    pm.test(\"❌ Edição de produto falhou - Status 400 Bad Request (Nome duplicado ou erro de validação)\", () => {",
+							"        pm.expect(json).to.have.property(\"message\");",
+							"        // Pode haver diferentes mensagens para 400: \"Já existe produto com esse nome\", validações de campo",
+							"        pm.expect(json.message).to.include(\"Já existe produto com esse nome\"); // Exemplo",
+							"    });",
+							"    const errorSchema400 = { type: \"object\", required: [\"message\"], properties: { message: { type: \"string\" } } };",
+							"    pm.test(\"❌ Schema de erro (400) é válido\", () => { pm.expect(tv4.validate(json, errorSchema400)).to.be.true; });",
+							"}",
+							"else if (status === 201) { // Caso o PUT do ServeRest retorne 201 em vez de 200 para criação de novo",
+							"     pm.test(\"❌ Status 201 inesperado para PUT (pode indicar criação em vez de edição)\", () => {",
+							"         // Este teste deve falhar se o PUT retornou 201. O PUT deve alterar um existente.",
+							"         pm.expect.fail(\"PUT retornou 201, indicando criação em vez de alteração.\");",
+							"     });",
+							"}",
+							"// --- OUTRO STATUS INESPERADO ---",
+							"else {",
+							"    pm.test(\"⚠️ Status inesperado na edição de produto\", () => {",
+							"        pm.expect([200, 401, 400]).to.include(status);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"nome\": \"Produto Editado QA {{timestamp}}\",\n  \"preco\": 250,\n  \"descricao\": \"Atualização de teste\",\n  \"quantidade\": 50\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/produtos/{{productId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"produtos",
+						"{{productId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5 - Excluir Produto",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"// --- CENÁRIO POSITIVO: Produto excluído com sucesso ---",
+							"if (status === 200) {",
+							"    pm.test(\"✅ Status code é 200 OK (Produto excluído com sucesso)\", () => {",
+							"        pm.response.to.have.status(200);",
+							"    });",
+							"",
+							"    pm.test(\"✅ Mensagem de sucesso é 'Registro excluído com sucesso'\", () => {",
+							"        pm.expect(json.message).to.eql(\"Registro excluído com sucesso\");",
+							"    });",
+							"",
+							"    const schemaSucesso = {",
+							"        type: \"object\",",
+							"        required: [\"message\"],",
+							"        properties: {",
+							"            message: { type: \"string\" }",
+							"        }",
+							"    };",
+							"",
+							"    pm.test(\"✅ Schema da resposta de sucesso é válido\", () => {",
+							"        pm.expect(tv4.validate(json, schemaSucesso)).to.be.true;",
+							"    });",
+							"",
+							"    // Opcional: Limpar a variável productId após a exclusão para evitar uso indevido",
+							"    // pm.environment.unset(\"productId\");",
+							"    // console.log(\"Variável productId limpa após exclusão.\");",
+							"",
+							"}",
+							"// --- CENÁRIOS NEGATIVOS ---",
+							"else if (status === 401) {",
+							"    pm.test(\"❌ Exclusão de produto falhou - Status 401 Unauthorized\", () => {",
+							"        pm.expect(json.message).to.eql(\"Token de acesso ausente, inválido, expirado ou usuário do token não existe mais\");",
+							"    });",
+							"    const errorSchema401 = { type: \"object\", required: [\"message\"], properties: { message: { type: \"string\" } } };",
+							"    pm.test(\"❌ Schema de erro (401) é válido\", () => { pm.expect(tv4.validate(json, errorSchema401)).to.be.true; });",
+							"}",
+							"else if (status === 404) { // Se o produto não foi encontrado (já excluído ou ID inválido)",
+							"    pm.test(\"❌ Exclusão de produto falhou - Status 404 Not Found (Produto não existe)\", () => {",
+							"        pm.expect(json.message).to.eql(\"Produto não encontrado\");",
+							"    });",
+							"    const errorSchema404 = { type: \"object\", required: [\"message\"], properties: { message: { type: \"string\" } } };",
+							"    pm.test(\"❌ Schema de erro (404) é válido\", () => { pm.expect(tv4.validate(json, errorSchema404)).to.be.true; });",
+							"}",
+							"// --- OUTRO STATUS INESPERADO ---",
+							"else {",
+							"    pm.test(\"⚠️ Status inesperado na exclusão de produto\", () => {",
+							"        pm.expect([200, 401, 404]).to.include(status);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/produtos/{{productId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"produtos",
+						"{{productId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5 - Verificar Exclusão",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"pm.test(\"✅ Status code é 400 Bad Request (Produto não deveria ser encontrado após exclusão)\", () => {",
+							"    pm.expect(status).to.eql(400); // MUDOU AQUI: Agora espera 400",
+							"});",
+							"",
+							"pm.test(\"✅ Mensagem de erro é 'Produto não encontrado'\", () => {",
+							"    pm.expect(json.message).to.eql(\"Produto não encontrado\");",
+							"});",
+							"",
+							"// Opcional: Validar o schema para 400",
+							"const errorSchema400 = { // Renomeado para 400",
+							"    type: \"object\",",
+							"    required: [\"message\"],",
+							"    properties: {",
+							"        message: { type: \"string\" }",
+							"    }",
+							"};",
+							"pm.test(\"✅ Schema da resposta de erro (400) é válido\", () => { // Renomeado para 400",
+							"    pm.expect(tv4.validate(json, errorSchema400)).to.be.true;",
+							"});",
+							"",
+							"// Se, por algum motivo, o status for 200 (indica que o DELETE falhou)",
+							"if (status === 200) {",
+							"    pm.test(\"❌ Erro: Produto encontrado após a exclusão (Status 200 inesperado)\", () => {",
+							"        pm.expect.fail(\"O produto foi encontrado após a tentativa de exclusão. O DELETE falhou.\");",
+							"    });",
+							"}",
+							"// Outros status inesperados",
+							"else if (status !== 400) { // Agora verifica se não é 400, nem 200",
+							"    pm.test(\"⚠️ Status inesperado na verificação de produto excluído\", () => {",
+							"        pm.expect([400, 200]).to.include(status); // 200 é falha para este teste",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/produtos/{{productId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"produtos",
+						"{{productId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6 - Tentar Editar Produto Após Exclusão",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const status = pm.response.code;",
+							"const json = pm.response.json();",
+							"",
+							"// --- CENÁRIO POSITIVO (para este teste): Edição falha com 400 ou 404 (se ServeRest tivesse 404) ---",
+							"// Como o ServeRest retorna 400 para 'não encontrado' em GET, é provável que PUT também.",
+							"// E se ele retornar 201, significa que ele recriou, o que também é um erro para o seu objetivo de \"não poder mais editar\".",
+							"if (status === 400) { // O esperado é 400, com a mensagem de \"Produto não encontrado\"",
+							"    pm.test(\"✅ Status code é 400 Bad Request (Produto não existe para edição)\", () => {",
+							"        pm.response.to.have.status(400);",
+							"    });",
+							"",
+							"    pm.test(\"✅ Mensagem de erro é 'Produto não encontrado'\", () => {",
+							"        pm.expect(json.message).to.eql(\"Produto não encontrado\");",
+							"    });",
+							"",
+							"    const schemaErro = {",
+							"        type: \"object\",",
+							"        required: [\"message\"],",
+							"        properties: {",
+							"            message: { type: \"string\" }",
+							"        }",
+							"    };",
+							"",
+							"    pm.test(\"✅ Schema da resposta de erro (400) é válido\", () => {",
+							"        pm.expect(tv4.validate(json, schemaErro)).to.be.true;",
+							"    });",
+							"}",
+							"// --- CENÁRIO NEGATIVO (para este teste): Outros erros ou sucesso inesperado ---",
+							"else if (status === 201) { // Se retornar 201, ele criou o produto novamente, o que é uma falha para este teste",
+							"    pm.test(\"❌ Edição de produto resultou em criação inesperada (Status 201)\", () => {",
+							"        pm.expect.fail(\"Produto foi criado novamente após a exclusão. Não deveria ser possível editar/criar.\");",
+							"    });",
+							"}",
+							"else if (status === 200) { // Se retornar 200, ele editou o produto, o que é uma falha para este teste",
+							"    pm.test(\"❌ Edição de produto sucedeu inesperadamente (Status 200)\", () => {",
+							"        pm.expect.fail(\"Produto foi editado com sucesso, mas deveria ter sido excluído.\");",
+							"    });",
+							"}",
+							"else if (status === 401) {",
+							"    pm.test(\"❌ Edição de produto falhou com 401 (Token inválido, não 400)\", () => {",
+							"        pm.expect(json.message).to.eql(\"Token de acesso ausente, inválido, expirado ou usuário do token não existe mais\");",
+							"    });",
+							"}",
+							"// Adicione outros status de erro que a API possa retornar para uma requisição de PUT em um recurso inexistente, se houver.",
+							"else {",
+							"    pm.test(\"⚠️ Status inesperado ao tentar editar produto excluído\", () => {",
+							"        // Agora, os status esperados para uma FALHA são 400 (produto não existe), ou 401 (token)",
+							"        // Se ele retornar 200 ou 201, isso é uma FALHA para o objetivo deste teste",
+							"        pm.expect([400, 401]).to.include(status);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"nome\": \"Produto Excluído - Tentativa de Edição {{timestamp}}\",\n  \"preco\": 300,\n  \"descricao\": \"Tentando editar produto que não existe\",\n  \"quantidade\": 12\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/produtos/{{productId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"produtos",
+						"{{productId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
